@@ -55,14 +55,14 @@ export default function InitPage() {
         }
     };
 
-    const getTaskToServer = async () => {
+    const getTaskToServer = async ()=>{
         try {
             const response = await axios.get('http://localhost:5053/api/notas/GetNotas');
-            const maxId = response.data.length > 0 
-                ? Math.max(...response.data.map((task: Task) => task.id)) 
-                : 0; 
-            setContadorID(maxId + 1);
+            console.log('Tareas obtenidas:', response.data);
+            // response.data.lenght()
+            // setContadorID(response.data.lenght())
             setTaskList(response.data);
+            
         } catch (error: any) {
             console.error('Error al obtener las tareas:', error.response?.data || error.message);
         }
@@ -80,18 +80,12 @@ export default function InitPage() {
         } else {
             const { id, ...newTask } = task;
             const newTaskWithId = { id: contadorID, ...newTask };
-
-            // Incrementamos el contadorID para el próximo id
             setContadorID(prevID => prevID + 1);
-
-            // Agregamos la nueva tarea a la lista
             setTaskList(prevtasklist => [
                 ...prevtasklist,
                 newTaskWithId,
             ]);
-
-            // Enviamos la tarea al servidor
-            sendTaskToServer(newTaskWithId);
+            sendTaskToServer(newTaskWithId); 
         }
         setTask({
             id: 0,
