@@ -1,9 +1,12 @@
-import InitPage from './pages/InitPage';
+// import InitPage from './pages/InitPage';
+
+import LogintPage from "./pages/LoginPage";
 
 function App() {
 
   return (
-    <InitPage/>
+    // <InitPage/>
+    <LogintPage></LogintPage>
   )
 }
 

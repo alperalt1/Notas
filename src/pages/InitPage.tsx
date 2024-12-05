@@ -4,6 +4,7 @@ import { FaRegTrashCan } from "react-icons/fa6";
 import { FaRegEdit } from "react-icons/fa";
 import { MdDone } from "react-icons/md";
 import axios from 'axios';
+import { useParams } from "react-router-dom";
 
 interface Task {
     id: number;
@@ -13,137 +14,141 @@ interface Task {
     fecha: string;
 }
 
+export interface NotaDto {
+    notaId: number;
+    tarea: string;
+    descripcion: string;
+    status: boolean;
+    fecha: string;
+    usuarioId: number;
+}
+
 export default function InitPage() {
+    const { usuarioId } = useParams<{ usuarioId: string }>();
     const [contadorID, setContadorID] = useState<number>(0);
-    const [task, setTask] = useState<Task>({
-        id: contadorID,
+    const [task, setTask] = useState<NotaDto>({
+        notaId: 0, 
         tarea: '',
         descripcion: '',
         status: false,
         fecha: '',
+        usuarioId: parseInt(usuarioId?? "0") || 0  // UsuarioId puede ser undefined, asegurate de que siempre esté presente
     });
 
-    const [tasklist, setTaskList] = useState<Task[]>([]);
+    const [tasklist, setTaskList] = useState<NotaDto[]>([]);
 
-    // const getSavedTasks = () => {
-    //     const storedTasks = localStorage.getItem("task");
-    //     if (storedTasks) {
-    //         try {
-    //             const parsedTasks: Task[] = JSON.parse(storedTasks);
-    //             setTaskList(parsedTasks);
-    //             console.log('tasks', parsedTasks)
-    //             const lastTaskID = parsedTasks.length > 0 ? parsedTasks[parsedTasks.length - 1].id : 0;
-    //             console.log('lastIndex', lastTaskID)
-    //             setContadorID(lastTaskID + 1); // Sumar 1 para el siguiente ID
-    //         } catch (error) {
-    //             console.error("Error al leer el localStorage:", error);
-    //         }
-    //     }
-    // }
-
-    const sendTaskToServer = async (newTask: Omit<Task, 'id'>) => {
+    const sendTaskToServer = async (newTask: NotaDto) => {
+        console.log(newTask)
         try {
-            const response = await axios.post('http://localhost:5053/api/notas', newTask, {
+            const response = await axios.post('http://localhost:5053/api/notas', {...newTask, notaId: 0}, {
                 headers: {
                     'Content-Type': 'application/json',
                 },
             });
-
             console.log('Tarea enviada correctamente:', response.data);
         } catch (error: any) {
             console.error('Error de red al enviar tarea:', error.response?.data || error.message);
+            throw new Error;
         }
     };
 
     const getTaskToServer = async () => {
         try {
-            const response = await axios.get('http://localhost:5053/api/notas/GetNotas');
-            const maxId = response.data.length > 0 
-                ? Math.max(...response.data.map((task: Task) => task.id)) 
-                : 0; 
+            const response = await axios.get(`http://localhost:5053/api/notas/${usuarioId}`);
+            console.log(response.data);
+            const maxId = response.data.length > 0
+                ? Math.max(...response.data.map((task: Task) => task.id))
+                : 0;
             setContadorID(maxId + 1);
             setTaskList(response.data);
         } catch (error: any) {
             console.error('Error al obtener las tareas:', error.response?.data || error.message);
         }
     }
+
+    const deletefunc = async (id: number) => {
+        try {
+            const response = await axios.delete(`http://localhost:5053/api/notas/${id}`);
+            console.log('Tarea eliminada:', response.data);
+        } catch (error: any) {
+            console.error('Error al eliminar la tarea:', error.response?.data || error.message);
+        }
+    };
+
+    const putfun = async (id: number, task: NotaDto) => {
+        try {
+            const response = await axios.put(`http://localhost:5053/api/notas/${id}`, task);
+            console.log('Tarea actualizada:', response.data);
+        } catch (error: any) {
+            console.error('Error al actualizar la tarea:', error.response?.data || error.message);
+        }
+    }
+
+    const putstatusfun = async (id: number, status: boolean) => {
+        try {
+            const response = await axios.put(`http://localhost:5053/api/notas/status/${id}`, { status }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            console.log('Tarea actualizada:', response.data);
+        } catch (error: any) {
+            console.error('Error al actualizar la tarea:', error.response?.data || error.message);
+        }
+    };
+
     useEffect(() => {
-        getTaskToServer();  // Llamamos a la función cuando el componente se monta
+        getTaskToServer();
     }, []);
+
     const [editbutton, setEditButton] = useState<boolean>(false);
-    // Manejo de formulario
-    const handleSubmit = (e: { preventDefault: () => void; }) => {
+
+    const handleSubmit = async (e: { preventDefault: () => void; }) => {
         e.preventDefault();
         if (editbutton) {
-            setTaskList(prevtasklist => prevtasklist.map(taskitem => taskitem.id === task.id ? { ...taskitem, ...task } : taskitem));
+            setTaskList(prev => prev.map(taskItem => taskItem.notaId === task.notaId ? { ...taskItem, ...task } : taskItem));
+            putfun(task.notaId, task);
             setEditButton(false);
         } else {
-            const { id, ...newTask } = task;
-            const newTaskWithId = { id: contadorID, ...newTask };
-
-            // Incrementamos el contadorID para el próximo id
+            const { notaId, ...newTask } = task;
+            const newTaskWithId = { notaId: contadorID, ...newTask };
             setContadorID(prevID => prevID + 1);
-
-            // Agregamos la nueva tarea a la lista
-            setTaskList(prevtasklist => [
-                ...prevtasklist,
-                newTaskWithId,
-            ]);
-
-            // Enviamos la tarea al servidor
-            sendTaskToServer(newTaskWithId);
+            await sendTaskToServer(newTaskWithId).then(() =>
+                setTaskList(prev => [...prev, newTaskWithId])
+            );
         }
-        setTask({
-            id: 0,
-            tarea: '',
-            descripcion: '',
-            status: false,
-            fecha: '',
-        });
+        setTask({ notaId: 0, tarea: '', descripcion: '', status: false, fecha: '', usuarioId: parseInt(usuarioId ?? "0") || 0 });
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setTask(prevtask => ({
-            ...prevtask,
-            [name]: value,
-        }));
+        setTask(prev => ({ ...prev, [name]: value }));
     };
 
-    // Botón eliminar
     const handleDelete = (id: number) => {
-        setTaskList(prevTaskList => prevTaskList.filter(taskitem => taskitem.id !== id));
+        setTaskList(prev => prev.filter(task => task.notaId !== id));
+        deletefunc(id);
     };
 
-    // Botón editar
     const handleEdit = (id: number) => {
-        const newTask = tasklist.find(taskitem => taskitem.id === id);
-        setEditButton(true);
-        if (newTask) {
-            setTask({ ...newTask });
+        const taskToEdit = tasklist.find(task => task.notaId === id);
+        if (taskToEdit) {
+            setEditButton(true);
+            setTask({ ...taskToEdit });
         }
     };
 
-    // Botón marcar tarea como completada
-    const handleCheck = (id: number) => {
-        setTaskList(prevtasklist =>
-            prevtasklist.map(t =>
-                t.id === id ? { ...t, status: !t.status } : t
-            )
+    const handleCheck = async (id: number) => {
+        const taskToUpdate = tasklist.find(task => task.notaId === id);
+        if (!taskToUpdate) return;
+
+        const updatedStatus = !taskToUpdate.status;
+        await putstatusfun(id, updatedStatus);
+
+        setTaskList(prev =>
+            prev.map(t => t.notaId === id ? { ...t, status: updatedStatus } : t)
         );
     };
-
-    // useEffect(() => {
-    //     getSavedTasks()
-
-
-    // }, []);
-
-    // useEffect(() => {
-    //     if (tasklist.length > 0) {
-    //         localStorage.setItem("task", JSON.stringify(tasklist));
-    //     }
-    // }, [tasklist]);
 
     return (
         <div className='h-screen p-6'>
@@ -179,7 +184,6 @@ export default function InitPage() {
                             onChange={handleChange}
                             className='border-2 rounded p-2 h-10 w-full'
                         />
-
                         <div className='justify-center text-center'>
                             <button
                                 type='submit'
@@ -191,31 +195,26 @@ export default function InitPage() {
                     </form>
                 </div>
                 <div className='border-2 rounded bg-scroll p-4 h-full max-h-screen overflow-y-auto flex flex-col flex-grow w-1/2'>
-                    {tasklist.map((tasks, index) => (
+                    {tasklist.map((task, index) => (
                         <div key={index} className="border-2 rounded w-full h-44 mb-2 px-2 pb-3">
                             <div className='flex flex-row justify-between font-semibold mt-2'>
-                                <div>{tasks.id}</div>
-                                {tasks.tarea}
+                                <div>{task.notaId}</div>
+                                {task.tarea}
                                 <div>
-                                    <button onClick={() => handleEdit(tasks.id)} className='mr-2'>
+                                    <button onClick={() => handleEdit(task.notaId)} className='mr-2'>
                                         <FaRegEdit />
                                     </button>
-                                    <button onClick={() => handleDelete(tasks.id)} className='mr-2'>
+                                    <button onClick={() => handleDelete(task.notaId)} className='mr-2'>
                                         <FaRegTrashCan />
                                     </button>
                                 </div>
                             </div>
-                            <p className='text-wrap'>{tasks.descripcion}</p>
-                            <p className='mt-2'>
-                                {tasks.fecha}
-
-                            </p>
+                            <p className='text-wrap'>{task.descripcion}</p>
+                            <p className='mt-2'>{task.fecha}</p>
                             <div>
-                                <button onClick={() => handleCheck(tasks.id)}>
-                                    {tasks.status ?
-                                        <MdDone className='bg-green-700 rounded-2xl w-5 h-5' /> :
-                                        <IoIosCloseCircleOutline className='bg-red-600 rounded-2xl w-5 h-5' />
-                                    }
+                                <button onClick={() => handleCheck(task.notaId)}>
+                                    {task.status ? <MdDone className='bg-green-700 rounded-2xl w-5 h-5' /> :
+                                    <IoIosCloseCircleOutline className='bg-red-600 rounded-2xl w-5 h-5' />}
                                 </button>
                             </div>
                         </div>
